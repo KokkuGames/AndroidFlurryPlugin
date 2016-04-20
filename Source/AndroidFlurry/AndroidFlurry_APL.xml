@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--GearVR plugin additions-->
+<root xmlns:android="http://schemas.android.com/apk/res/android">
+	<!-- init section is always evaluated once per architecture -->
+	<trace enable="true"/>
+	<init>		
+	</init>
+
+  <androidManifestUpdates>
+    <addPermission android:name="android.permission.INTERNET"/>
+	<addPermission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+	
+	<!-- Read API key from config and add to the manifest -->  
+    <setStringFromProperty result="ApiKey" ini="Engine" section="Analytics" property="FlurryApiKey" default=""/>
+    <setElement result="ApiKeyMetadata" value="meta-data"/>
+    <addAttribute tag="$ApiKeyMetadata" name="android:name" value="com.epicgames.ue4.flurry.ApiKey"/>
+    <addAttribute tag="$ApiKeyMetadata" name="android:value" value="$S(ApiKey)"/>
+    <addElement tag="application" name="ApiKeyMetadata"/>
+	
+  </androidManifestUpdates>
+  
+	<!-- optional additions to proguard -->
+	<proguardAdditions>
+		<insert>
+-keep class com.flurry.android.FlurryAgent
+		</insert>
+	</proguardAdditions>
+	
+	<!-- optional files or directories to copy to Intermediate/Android/APK -->
+ 	<resourceCopies>		
+		<copyFile src="$S(PluginDir)/../../libs/FlurryAnalytics-6.3.0.jar" dst="$S(BuildDir)/libs/FlurryAnalytics-6.3.0.jar" />
+	</resourceCopies>
+
+	<!-- optional additions to the GameActivity imports in GameActivity.java -->
+	<gameActivityImportAdditions>
+		<insert>
+import com.flurry.android.FlurryAgent;
+		</insert>
+	</gameActivityImportAdditions>
+	
+
+	<!-- optional additions to the GameActivity class in GameActivity.java -->
+	<gameActivityClassAdditions>
+		<insert>
+		//public native void nativeCbWillDisplayVideo(String location);
+		
+		public Map&lt;String,String&gt; AndroidThunk_Flurry_CreateEventMap()
+		{
+			return new HashMap&lt;String, String&gt;();
+		}
+		
+		public void AndroidThunk_Flurry_MapPut(String Key, String Value, Map&lt;String,String&gt; TargetMap)
+		{
+			TargetMap.put(Key, Value);
+		}
+		</insert>
+	</gameActivityClassAdditions>
+	
+	<!-- optional additions to GameActivity onCreate metadata reading in GameActivity.java -->
+	<gameActivityReadMetadataAdditions>
+		<insert>		
+			if (bundle.containsKey("com.epicgames.ue4.flurry.ApiKey")) {
+				String ApiKey = bundle.getString("com.epicgames.ue4.flurry.ApiKey");
+								
+				Log.debug("FlurryAgent.init(\"" + ApiKey + "\")");
+				
+				FlurryAgent.init(this, ApiKey);
+			} else {
+				Log.debug("Missing FlurryApiKey");
+			}
+		</insert>
+	</gameActivityReadMetadataAdditions>
+	
+	<!-- optional additions to GameActivity onCreate in GameActivity.java -->
+	<gameActivityOnCreateAdditions>
+	</gameActivityOnCreateAdditions>
+
+	<!-- optional additions to GameActivity onDestroy in GameActivity.java -->
+	<gameActivityOnDestroyAdditions>
+		<insert>		
+		</insert>
+	</gameActivityOnDestroyAdditions>
+	
+	
+	<!-- optional additions to GameActivity onStart in GameActivity.java -->
+	<gameActivityOnStartAdditions>
+		<insert>
+		FlurryAgent.onStartSession(this);		
+		</insert>
+	</gameActivityOnStartAdditions>
+
+	<!-- optional additions to GameActivity onStop in GameActivity.java -->
+	<gameActivityOnStopAdditions>
+		<insert>
+		FlurryAgent.onEndSession(this);
+		</insert>
+	</gameActivityOnStopAdditions>
+	
+
+	<!-- optional additions to GameActivity onPause in GameActivity.java	-->
+	<gameActivityOnPauseAdditions>
+		<insert>		
+		</insert>
+	</gameActivityOnPauseAdditions>
+
+
+	<!-- optional additions to GameActivity onResume in GameActivity.java	-->
+	<gameActivityOnResumeAdditions>
+		<insert>		
+		</insert>
+	</gameActivityOnResumeAdditions>
+
+
+	<!-- optional additions to GameActivity onActivityResult in GameActivity.java -->
+	<gameActivityOnActivityResultAdditions>
+	</gameActivityOnActivityResultAdditions>
+	
+
+	<!-- optional libraries to load in GameActivity.java before libUE4.so -->
+	<soLoadLibrary>		
+	</soLoadLibrary>
+</root>

@@ -1,0 +1,23 @@
+{
+	"FileVersion" : 3,
+	
+	"FriendlyName" : "Android Flurry Analytics Provider",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Kokku Games Ltda.",
+	"CreatedByURL" : "http://www.kokkugames.com",
+	"DocsURL" : "",
+	"EngineVersion" : "4.8.0",
+	"Description" : "Flurry Analytics Provider for Android",
+	"Category" : "Analytics",
+	
+	"Modules" :
+	[
+		{
+			"Name" : "AndroidFlurry",
+			"Type" : "Runtime",
+			"LoadingPhase" : "PreDefault",
+			"WhitelistPlatforms" : [ "Android" ]
+		}
+	]
+}
