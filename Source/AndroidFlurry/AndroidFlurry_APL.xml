@@ -46,11 +46,13 @@ import com.flurry.android.FlurryAgent;
 		
 		public Map&lt;String,String&gt; AndroidThunk_Flurry_CreateEventMap()
 		{
+			Log.debug("AndroidThunk_Flurry_CreateEventMap()");
 			return new HashMap&lt;String, String&gt;();
 		}
 		
 		public void AndroidThunk_Flurry_MapPut(String Key, String Value, Map&lt;String,String&gt; TargetMap)
 		{
+			Log.debug("AndroidThunk_Flurry_MapPut(\"" + Key + "\", \"" + Value + "\", \"" + TargetMap + "\")");
 			TargetMap.put(Key, Value);
 		}
 		</insert>

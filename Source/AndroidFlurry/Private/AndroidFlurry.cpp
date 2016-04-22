@@ -56,29 +56,38 @@ public:
 	FFlurryEventMap()
 	{
 		JNIEnv* Env = FAndroidApplication::GetJavaEnv(true);
+
+		UE_LOG(LogAnalytics, Log, TEXT("FFlurryEventMap()"));
+
 		
 		if (CreateMethod == nullptr)
 		{
 			check(Env != NULL);
+
+			UE_LOG(LogAnalytics, Log, TEXT("FFlurryEventMap() - init CreateMethod"));
 			
 			CreateMethod = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID,
-				"AndroidThunk_Flurry_CreateEventMap", "()Ljava/util/Map<Ljava/lang/String;Ljava/lang/String;>;", true);
+				"AndroidThunk_Flurry_CreateEventMap", "()Ljava/util/Map;", true);
 			check(CreateMethod != NULL);
 			
 			PutMethod = FJavaWrapper::FindMethod(Env, FJavaWrapper::GameActivityClassID,
-				"AndroidThunk_Flurry_MapPut", "(Ljava/lang/String;Ljava/lang/String;Ljava/util/Map<Ljava/lang/String;Ljava/lang/String;>;)V", true);
+				"AndroidThunk_Flurry_MapPut", "(Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V", true);
 			check(CreateMethod != NULL);
 		}
 
 		auto MapLocal = FJavaWrapper::CallObjectMethod(Env, FJavaWrapper::GameActivityThis, CreateMethod);
 		Map = Env->NewGlobalRef(MapLocal);
 		Env->DeleteLocalRef(MapLocal);
+
+		UE_LOG(LogAnalytics, Log, TEXT("FFlurryEventMap() - Map=%p"), Map);
 	}
 	~FFlurryEventMap()
 	{
-		JNIEnv* Env = FAndroidApplication::GetJavaEnv(true);
+		UE_LOG(LogAnalytics, Log, TEXT("~FFlurryEventMap() - Map=%p"), Map);
 
+		JNIEnv* Env = FAndroidApplication::GetJavaEnv(true);
 		Env->DeleteGlobalRef(Map);
+		Map = nullptr;
 	}
 
 	void Put(const FString& Key, const FString& Value)
@@ -86,10 +95,13 @@ public:
 		jstringWrapper JKey(Key);
 		jstringWrapper JValue(Value);
 
+		UE_LOG(LogAnalytics, Log, TEXT("FFlurryEventMap::Put()"));
+
+
 		JNIEnv* Env = FAndroidApplication::GetJavaEnv(true);
 
 		FJavaWrapper::CallVoidMethod(Env, FJavaWrapper::GameActivityThis, 
-			PutMethod, JKey.Get(), JValue.Get());
+			PutMethod, JKey.Get(), JValue.Get(), Map);
 	}
 
 	jobject GetJObject() {
@@ -101,14 +113,17 @@ jmethodID FFlurryEventMap::PutMethod = nullptr;
 
 
 #define CALL_FLURRY_VOID(name, ...) \
-FAndroidApplication::GetJavaEnv(true)->CallStaticVoidMethod(Flurry::Class, Flurry::name, __VA_ARGS__)
+FAndroidApplication::GetJavaEnv()->CallStaticVoidMethod(Flurry::Class, Flurry::name, __VA_ARGS__)
 
 #define CALL_FLURRY_OBJECT(name, ...) \
-FAndroidApplication::GetJavaEnv(true)->CallStaticObjectMethod(Flurry::Class, Flurry::name, __VA_ARGS__)
+FAndroidApplication::GetJavaEnv()->CallStaticObjectMethod(Flurry::Class, Flurry::name, __VA_ARGS__)
 
 void FAnalyticsAndroidFlurry::StartupModule()
 {
 	JNIEnv* Env = FAndroidApplication::GetJavaEnv(true);
+
+	UE_LOG(LogAnalytics, Log, TEXT("FAnalyticsAndroidFlurry::StartupModule, Env=%p"), Env);
+
 
 	jclass LocalFlurryAgentClass = FAndroidApplication::FindJavaClass("com/flurry/android/FlurryAgent");
 	check(LocalFlurryAgentClass);	
@@ -116,7 +131,8 @@ void FAnalyticsAndroidFlurry::StartupModule()
 	Env->DeleteLocalRef(LocalFlurryAgentClass);
 
 #define GET_FLURRY_METHOD(name, signature) \
-	Flurry::name = FJavaWrapper::FindStaticMethod(Env, Flurry::Class, #name, signature, true)
+	Flurry::name = FJavaWrapper::FindStaticMethod(Env, Flurry::Class, #name, signature, true);\
+	check(Flurry::name)
 
 
 	GET_FLURRY_METHOD(setUserId, "(Ljava/lang/String;)V");	
@@ -124,7 +140,7 @@ void FAnalyticsAndroidFlurry::StartupModule()
 	GET_FLURRY_METHOD(setAge, "(I)V");
 	GET_FLURRY_METHOD(setLocation, "(FF)V");
 	GET_FLURRY_METHOD(getSessionId, "()Ljava/lang/String;");	
-	GET_FLURRY_METHOD(logEvent, "(Ljava/lang/String;Ljava/util/Maplang/String;Ljava/lang/String;>;)Lcom/flurry/android/FlurryEventRecordStatus;");
+	GET_FLURRY_METHOD(logEvent, "(Ljava/lang/String;Ljava/util/Map;)Lcom/flurry/android/FlurryEventRecordStatus;");
 	
 #undef GET_FLURRY_METHOD
 
@@ -248,12 +264,15 @@ void FAnalyticsProviderFlurry::RecordEvent(const FString& EventName, const TArra
 {
 	if (EventName.Len() > 0)
 	{
+		UE_LOG(LogAnalytics, Warning, TEXT("FAnalyticsAndroidFlurry::RecordEvent, EventName=%s"), *EventName);
+
 		jstringWrapper ConvertedEventName(EventName);
 		FFlurryEventMap ConvertedAttributes;
 
 		const int32 AttrCount = Attributes.Num();
 		for (auto Attr : Attributes)
 		{
+			UE_LOG(LogAnalytics, Log, TEXT("FAnalyticsAndroidFlurry::RecordEvent, Attr:%s=%s"), *Attr.AttrName, *Attr.AttrValue);
 			ConvertedAttributes.Put(Attr.AttrName, Attr.AttrValue);
 		}
 
@@ -263,190 +282,129 @@ void FAnalyticsProviderFlurry::RecordEvent(const FString& EventName, const TArra
 
 void FAnalyticsProviderFlurry::RecordItemPurchase(const FString& ItemId, const FString& Currency, int PerItemCost, int ItemQuantity)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Item Purchase";
+	FString EventName = "Item Purchase";
+	
 	// Build the dictionary
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:4];
-	[AttributesDict setValue:[NSString stringWithFString:ItemId] forKey:@"ItemId"];
-	[AttributesDict setValue:[NSString stringWithFString:Currency] forKey:@"Currency"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%d", PerItemCost] forKey:@"PerItemCost"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%d", ItemQuantity] forKey:@"ItemQuantity"];
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("ItemId", ItemId));
+	AttributesDict.Add(FAnalyticsEventAttribute("Currency", Currency));
+	AttributesDict.Add(FAnalyticsEventAttribute("PerItemCost", FString::FromInt(PerItemCost)));
+	AttributesDict.Add(FAnalyticsEventAttribute("ItemQuantity", FString::FromInt(ItemQuantity)));
+
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
 
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordItemPurchase('%s', '%s', %d, %d)"), *ItemId, *Currency, PerItemCost, ItemQuantity);
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
 
 void FAnalyticsProviderFlurry::RecordCurrencyPurchase(const FString& GameCurrencyType, int GameCurrencyAmount, const FString& RealCurrencyType, float RealMoneyCost, const FString& PaymentProvider)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Currency Purchase";
+	FString EventName = "Currency Purchase";
+
 	// Build the dictionary
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:5];
-	[AttributesDict setValue:[NSString stringWithFString:GameCurrencyType] forKey:@"GameCurrencyType"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%d", GameCurrencyAmount] forKey:@"GameCurrencyAmount"];
-	[AttributesDict setValue:[NSString stringWithFString:RealCurrencyType] forKey:@"RealCurrencyType"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%.02f", RealMoneyCost] forKey:@"RealMoneyCost"];
-	[AttributesDict setValue:[NSString stringWithFString:PaymentProvider] forKey:@"PaymentProvider"];
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyType", GameCurrencyType));
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyAmount", FString::FromInt(GameCurrencyAmount)));
+	AttributesDict.Add(FAnalyticsEventAttribute("RealCurrencyType", RealCurrencyType));
+	AttributesDict.Add(FAnalyticsEventAttribute("RealMoneyCost", FString::Printf(TEXT("%.02f"), RealMoneyCost)));
+	AttributesDict.Add(FAnalyticsEventAttribute("PaymentProvider", PaymentProvider));
+
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
 
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordCurrencyPurchase('%s', %d, '%s', %.02f, %s)"), *GameCurrencyType, GameCurrencyAmount, *RealCurrencyType, RealMoneyCost, *PaymentProvider);
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
 
 void FAnalyticsProviderFlurry::RecordCurrencyGiven(const FString& GameCurrencyType, int GameCurrencyAmount)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Currency Given";
+	FString EventName = "Currency Given";
+
 	// Build the dictionary
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:2];
-	[AttributesDict setValue:[NSString stringWithFString:GameCurrencyType] forKey:@"GameCurrencyType"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%d", GameCurrencyAmount] forKey:@"GameCurrencyAmount"];
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyType", GameCurrencyType));
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyAmount", FString::FromInt(GameCurrencyAmount)));
+	
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
 
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordCurrencyGiven('%s', %d)"), *GameCurrencyType, GameCurrencyAmount);
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
 
 void FAnalyticsProviderFlurry::RecordItemPurchase(const FString& ItemId, int ItemQuantity, const TArray<FAnalyticsEventAttribute>& EventAttrs)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Item Purchase";
+	FString EventName = "Item Purchase";
+
 	// Build the dictionary
-	int32 DictSize = EventAttrs.Num() + 2;
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:DictSize];
-	[AttributesDict setValue:[NSString stringWithFString:ItemId] forKey:@"ItemId"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%d", ItemQuantity] forKey:@"Quantity"];
-	for	(auto Attr : EventAttrs)
-	{
-		NSString* AttrName = [NSString stringWithFString : Attr.AttrName];
-		NSString* AttrValue = [NSString stringWithFString : Attr.AttrValue];
-		[AttributesDict setValue:AttrValue forKey:AttrName];
-	}
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("ItemId", ItemId));
+	AttributesDict.Add(FAnalyticsEventAttribute("ItemQuantity", FString::FromInt(ItemQuantity)));
+	AttributesDict.Append(EventAttrs);
+
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
 
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordItemPurchase('%s', %d, %d)"), *ItemId, ItemQuantity, EventAttrs.Num());
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
 
 void FAnalyticsProviderFlurry::RecordCurrencyPurchase(const FString& GameCurrencyType, int GameCurrencyAmount, const TArray<FAnalyticsEventAttribute>& EventAttrs)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Currency Purchase";
+	FString EventName = "Currency Purchase";
+
 	// Build the dictionary
-	int32 DictSize = EventAttrs.Num() + 2;
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:DictSize];
-	[AttributesDict setValue:[NSString stringWithFString:GameCurrencyType] forKey:@"GameCurrencyType"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%d", GameCurrencyAmount] forKey:@"GameCurrencyAmount"];
-	for	(auto Attr : EventAttrs)
-	{
-		NSString* AttrName = [NSString stringWithFString : Attr.AttrName];
-		NSString* AttrValue = [NSString stringWithFString : Attr.AttrValue];
-		[AttributesDict setValue:AttrValue forKey:AttrName];
-	}
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyType", GameCurrencyType));
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyAmount", FString::FromInt(GameCurrencyAmount)));
+	AttributesDict.Append(EventAttrs);
+
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
+
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordCurrencyPurchase('%s', %d, %d)"), *GameCurrencyType, GameCurrencyAmount, EventAttrs.Num());
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
 
 void FAnalyticsProviderFlurry::RecordCurrencyGiven(const FString& GameCurrencyType, int GameCurrencyAmount, const TArray<FAnalyticsEventAttribute>& EventAttrs)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Currency Given";
+	FString EventName = "Currency Given";
+
 	// Build the dictionary
-	int32 DictSize = EventAttrs.Num() + 2;
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:DictSize];
-	[AttributesDict setValue:[NSString stringWithFString:GameCurrencyType] forKey:@"GameCurrencyType"];
-	[AttributesDict setValue:[NSString stringWithFormat:@"%d", GameCurrencyAmount] forKey:@"GameCurrencyAmount"];
-	for	(auto Attr : EventAttrs)
-	{
-		NSString* AttrName = [NSString stringWithFString : Attr.AttrName];
-		NSString* AttrValue = [NSString stringWithFString : Attr.AttrValue];
-		[AttributesDict setValue:AttrValue forKey:AttrName];
-	}
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyType", GameCurrencyType));
+	AttributesDict.Add(FAnalyticsEventAttribute("GameCurrencyAmount", FString::FromInt(GameCurrencyAmount)));
+	AttributesDict.Append(EventAttrs);
+
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
 
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordCurrencyGiven('%s', %d, %d)"), *GameCurrencyType, GameCurrencyAmount, EventAttrs.Num());
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
 
 void FAnalyticsProviderFlurry::RecordError(const FString& Error, const TArray<FAnalyticsEventAttribute>& EventAttrs)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Error";
+	FString EventName = "Error";
+
 	// Build the dictionary
-	int32 DictSize = EventAttrs.Num() + 1;
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:DictSize];
-	[AttributesDict setValue:[NSString stringWithFString:Error] forKey:@"Error"];
-	for	(auto Attr : EventAttrs)
-	{
-		NSString* AttrName = [NSString stringWithFString : Attr.AttrName];
-		NSString* AttrValue = [NSString stringWithFString : Attr.AttrValue];
-		[AttributesDict setValue:AttrValue forKey:AttrName];
-	}
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("Error", Error));
+	AttributesDict.Append(EventAttrs);
+
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
 
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordError('%s', %d)"), *Error, EventAttrs.Num());
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
 
 void FAnalyticsProviderFlurry::RecordProgress(const FString& ProgressType, const FString& ProgressHierarchy, const TArray<FAnalyticsEventAttribute>& EventAttrs)
 {
-#if WITH_FLURRY
-	NSString* EventName = @"Progress";
+	FString EventName = "Progress";
+
 	// Build the dictionary
-	int32 DictSize = EventAttrs.Num() + 2;
-	NSDictionary* AttributesDict = [NSMutableDictionary dictionaryWithCapacity:DictSize];
-	[AttributesDict setValue:[NSString stringWithFString:ProgressType] forKey:@"ProgressType"];
-	[AttributesDict setValue:[NSString stringWithFString:ProgressHierarchy] forKey:@"ProgressHierarchy"];
-	for	(auto Attr : EventAttrs)
-	{
-		NSString* AttrName = [NSString stringWithFString : Attr.AttrName];
-		NSString* AttrValue = [NSString stringWithFString : Attr.AttrValue];
-		[AttributesDict setValue:AttrValue forKey:AttrName];
-	}
+	TArray<FAnalyticsEventAttribute> AttributesDict;
+	AttributesDict.Add(FAnalyticsEventAttribute("ProgressType", ProgressType));
+	AttributesDict.Add(FAnalyticsEventAttribute("ProgressHierarchy", ProgressHierarchy));
+	AttributesDict.Append(EventAttrs);
+
 	// Send the event
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry logEvent:EventName withParameters:AttributesDict];
-	});
+	RecordEvent(EventName, AttributesDict);
 
 	UE_LOG(LogAnalytics, Display, TEXT("AndroidFlurry::RecordProgress('%s', %s, %d)"), *ProgressType, *ProgressHierarchy, EventAttrs.Num());
-#else
-	UE_LOG(LogAnalytics, Warning, TEXT("WITH_FLURRY=0. Are you missing the SDK?"));
-#endif
 }
