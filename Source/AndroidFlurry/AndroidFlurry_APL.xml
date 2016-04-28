@@ -22,7 +22,12 @@
 	<!-- optional additions to proguard -->
 	<proguardAdditions>
 		<insert>
--keep class com.flurry.android.FlurryAgent
+-keep class com.flurry.** { *; }
+-dontwarn com.flurry.**
+-keepattributes *Annotation*,EnclosingMethod
+-keepclasseswithmembers class * {
+	public &lt;init&gt;(android.content.Context, android.util.AttributeSet, int); 
+}
 		</insert>
 	</proguardAdditions>
 	
