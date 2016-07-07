@@ -33,6 +33,7 @@
 	
 	<!-- optional files or directories to copy to Intermediate/Android/APK -->
  	<resourceCopies>		
+    <deleteFiles filespec="libs/FlurryAnalytics*.jar"/>
 		<copyFile src="$S(PluginDir)/../../libs/flurryAnalytics_6.4.0.jar" dst="$S(BuildDir)/libs/flurryAnalytics_6.4.0.jar" />
 	</resourceCopies>
 
