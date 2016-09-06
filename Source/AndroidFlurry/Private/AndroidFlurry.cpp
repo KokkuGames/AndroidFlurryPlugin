@@ -151,7 +151,7 @@ void FAnalyticsAndroidFlurry::ShutdownModule()
 	FAnalyticsProviderFlurry::Destroy();
 }
 
-TSharedPtr<IAnalyticsProvider> FAnalyticsAndroidFlurry::CreateAnalyticsProvider(const FAnalytics::FProviderConfigurationDelegate& GetConfigValue) const
+TSharedPtr<IAnalyticsProvider> FAnalyticsAndroidFlurry::CreateAnalyticsProvider(const FAnalyticsProviderConfigurationDelegate& GetConfigValue) const
 {
 	if (GetConfigValue.IsBound())
 	{
