@@ -1,6 +1,11 @@
-// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
+// Copyright 2018 Kokku. All Rights Reserved.
 
-#include "AndroidFlurryPrivatePCH.h"
+#include "AndroidFlurry.h" 
+
+#include "AndroidFlurryProvider.h" 
+#include "Android/AndroidJNI.h" 
+#include "Android/AndroidApplication.h"
+#include "AndroidJava.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogAnalytics, Display, All);
 
@@ -240,9 +245,8 @@ void FAnalyticsProviderFlurry::SetLocation(const FString& InLocation)
 	double Latitude = FCString::Atod(*Lat);
 	double Longitude = FCString::Atod(*Long);
 
-	dispatch_async(dispatch_get_main_queue(), ^{
-		[Flurry setLatitude:Latitude longitude:Longitude horizontalAccuracy:0.0 verticalAccuracy:0.0];
-	});
+	jstringWrapper LatWrap(Lat), LongWrap(Long);
+	CALL_FLURRY_OBJECT(setLocation, Latitude, Longitude, 0.0, 0.0);
 
 	UE_LOG(LogAnalytics, Display, TEXT("Parsed \"lat, long\" string in AndroidFlurry::SetLocation(%s) as \"%f, %f\""), *InLocation, Latitude, Longitude);
 #else
@@ -272,8 +276,8 @@ void FAnalyticsProviderFlurry::RecordEvent(const FString& EventName, const TArra
 		const int32 AttrCount = Attributes.Num();
 		for (auto Attr : Attributes)
 		{
-			UE_LOG(LogAnalytics, Log, TEXT("FAnalyticsAndroidFlurry::RecordEvent, Attr:%s=%s"), *Attr.AttrName, *Attr.AttrValue);
-			ConvertedAttributes.Put(Attr.AttrName, Attr.AttrValue);
+			UE_LOG(LogAnalytics, Log, TEXT("FAnalyticsAndroidFlurry::RecordEvent, Attr:%s=%s"), *Attr.AttrName, *Attr.AttrValueString);
+			ConvertedAttributes.Put(Attr.AttrName, Attr.AttrValueString);
 		}
 
 		CALL_FLURRY_OBJECT(logEvent, ConvertedEventName.Get(), ConvertedAttributes.GetJObject());

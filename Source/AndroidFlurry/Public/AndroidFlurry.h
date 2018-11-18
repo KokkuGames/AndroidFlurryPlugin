@@ -1,9 +1,10 @@
-// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
+// Copyright 2018 Kokku. All Rights Reserved.
 
 #pragma once
 
+#include "CoreMinimal.h"
 #include "IAnalyticsProviderModule.h"
-#include "Core.h"
+#include "Modules/ModuleManager.h"
 
 class IAnalyticsProvider;
 

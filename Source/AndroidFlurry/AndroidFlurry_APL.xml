@@ -7,8 +7,6 @@
 	</init>
 
   <androidManifestUpdates>
-    <addPermission android:name="android.permission.INTERNET"/>
-	<addPermission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 	
 	<!-- Read API key from config and add to the manifest -->  
     <setStringFromProperty result="ApiKey" ini="Engine" section="Analytics" property="FlurryApiKey" default=""/>
@@ -21,21 +19,12 @@
   
 	<!-- optional additions to proguard -->
 	<proguardAdditions>
-		<insert>
--keep class com.flurry.** { *; }
--dontwarn com.flurry.**
--keepattributes *Annotation*,EnclosingMethod
--keepclasseswithmembers class * {
-	public &lt;init&gt;(android.content.Context, android.util.AttributeSet, int); 
-}
-		</insert>
 	</proguardAdditions>
 	
-	<!-- optional files or directories to copy to Intermediate/Android/APK -->
- 	<resourceCopies>		
-    <deleteFiles filespec="libs/FlurryAnalytics*.jar"/>
-		<copyFile src="$S(PluginDir)/../../libs/flurryAnalytics_6.4.0.jar" dst="$S(BuildDir)/libs/flurryAnalytics_6.4.0.jar" />
-	</resourceCopies>
+	<AARImports> 
+		<insert>com.flurry.android,analytics,11.4.0@aar</insert> 
+		<insertNewline/> 
+	</AARImports>
 
 	<!-- optional additions to the GameActivity imports in GameActivity.java -->
 	<gameActivityImportAdditions>
@@ -74,6 +63,8 @@ import com.flurry.android.FlurryAgent;
 				
 				new FlurryAgent.Builder()
 					.withLogEnabled(false)
+					.withCaptureUncaughtExceptions(true)
+					.withContinueSessionMillis(10000)
 					.build(this, ApiKey);
 			} else {
 				Log.debug("Missing FlurryApiKey");
@@ -94,16 +85,10 @@ import com.flurry.android.FlurryAgent;
 	
 	<!-- optional additions to GameActivity onStart in GameActivity.java -->
 	<gameActivityOnStartAdditions>
-		<insert>
-		FlurryAgent.onStartSession(this);		
-		</insert>
 	</gameActivityOnStartAdditions>
 
 	<!-- optional additions to GameActivity onStop in GameActivity.java -->
 	<gameActivityOnStopAdditions>
-		<insert>
-		FlurryAgent.onEndSession(this);
-		</insert>
 	</gameActivityOnStopAdditions>
 	
 

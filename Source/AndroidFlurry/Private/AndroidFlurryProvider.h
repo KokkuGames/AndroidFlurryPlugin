@@ -1,6 +1,8 @@
-// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
+// Copyright 2018 Kokku. All Rights Reserved.
 
 #pragma once
+
+#include "IAnalyticsProvider.h"
 
 class FAnalyticsProviderFlurry :
 	public IAnalyticsProvider
