@@ -16,22 +16,37 @@
     <addElement tag="application" name="ApiKeyMetadata"/>
 	
   </androidManifestUpdates>
-  
-	<!-- optional additions to proguard -->
-	<proguardAdditions>
-	</proguardAdditions>
-	
-	<AARImports> 
-		<insert>com.flurry.android,analytics,11.4.0@aar</insert> 
-		<insertNewline/> 
-	</AARImports>
 
+  <proguardAdditions>
+    <insert>
+-keep class com.flurry.** { *; }
+-keep class com.flurry.android.** { *; }
+-keep class com.flurry.android.Consent { public *;}
+-keep class com.flurry.android.FlurryAgent { public *;}
+-keep class com.flurry.android.FlurryAgent$1 { public *;}
+-keep class com.flurry.android.FlurryAgent$3 { public *;}
+-keep class com.flurry.android.FlurryAgent$1$1 { public *;}
+-keep class com.flurry.android.FlurryAgent$Builder { public *;}
+-keep class com.flurry.android.FlurryAgentListener { public *;}
+-keep class com.flurry.android.FlurryEventRecordStatus { public *;}
+-keep class com.flurry.android.FlurryModule { public *;}
+-keepattributes *Annotation*,EnclosingMethod
+-keepclasseswithmembers class * {
+public &lt;init&gt;(android.content.Context, android.util.AttributeSet, int);
+}
+    </insert>
+  </proguardAdditions>
+  
+  <AARImports>
+    <insert>com.flurry.android,analytics,11.4.0@aar</insert>
+    <insertNewline/> 
+	</AARImports>
+    
 	<!-- optional additions to the GameActivity imports in GameActivity.java -->
 	<gameActivityImportAdditions>
-		<insert>
-import com.flurry.android.FlurryAgent;
-		</insert>
-	</gameActivityImportAdditions>
+		<insert>import com.flurry.android.FlurryAgent;</insert>
+    <insertNewline/>
+  </gameActivityImportAdditions>
 	
 
 	<!-- optional additions to the GameActivity class in GameActivity.java -->
