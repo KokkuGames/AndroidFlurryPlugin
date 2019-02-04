@@ -8,6 +8,8 @@ namespace UnrealBuildTool.Rules
 	{
         public AndroidFlurry(ReadOnlyTargetRules Target) : base(Target)
 		{
+            PrivatePCHHeaderFile = "Public/AndroidFlurry.h";
+
             PublicDependencyModuleNames.AddRange(
             new string[]
             {
@@ -38,7 +40,12 @@ namespace UnrealBuildTool.Rules
 			{
 				string PluginPath = Utils.MakePathRelativeTo(ModuleDirectory, Target.RelativeEnginePath);
 				AdditionalPropertiesForReceipt.Add("AndroidPlugin", Path.Combine(PluginPath, "AndroidFlurry_APL.xml"));
+
+#if UE_4_19_OR_LATER
+                PublicDefinitions.Add("WITH_FLURRY=1");
+#else
                 Definitions.Add("WITH_FLURRY=1");
+#endif
             }
         }
 	}
